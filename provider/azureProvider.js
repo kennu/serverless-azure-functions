@@ -429,7 +429,7 @@ return new BbPromise((resolve, reject) => {
     if (eventType === 'http') {
       let queryString = '';
 
-      if (eventData) {     
+      if (eventData) {
         if (typeof eventData === "string") {
           try {
             eventData = JSON.parse(eventData);
@@ -467,9 +467,9 @@ return new BbPromise((resolve, reject) => {
         });
       });
     }
-    
+
     const requestUrl = `https://${functionAppName}${constants.functionsAdminApiPath}${functionName}`;
-      
+
     options = {
       'host': constants.functionAppDomain,
       'method': 'post',
@@ -601,7 +601,7 @@ return new BbPromise((resolve, reject) => {
         'Content-Type': constants.jsonContentType
       }
     };
-    
+
 return new BbPromise((resolve, reject) => {
       if (fs.existsSync(packageJsonFilePath)) {
         fs.createReadStream(packageJsonFilePath)
@@ -615,6 +615,29 @@ return new BbPromise((resolve, reject) => {
       }
       else{
           resolve('Package json file does not exist');
+      }
+    });
+  }
+
+  copyDependencies (sourcePath, destPath) {
+    const excluded = ['.', '..', 'functions', '.serverless', 'node_modules', 'package.json', 'serverless.yml', 'yarn.lock', 'npm-debug.log', '.npmignore', '.gitignore'];
+    const files = fs.readdirSync(sourcePath).filter(name => excluded.indexOf(name) < 0);
+
+    files.map(name => {
+      const sourceFile = path.join(sourcePath, name);
+      const destFile = path.join(destPath, name);
+      const st = fs.statSync(sourceFile);
+      if (st.isFile()) {
+        fs.writeFileSync(destFile, fs.readFileSync(sourceFile));
+      } else if (st.isDirectory()) {
+        try {
+          fs.mkdirSync(destFile);
+        } catch (err) {
+          if (err.code !== 'EEXIST') {
+            throw err;
+          }
+        }
+        return this.copyDependencies(sourceFile, destFile);
       }
     });
   }
@@ -638,6 +661,9 @@ return new BbPromise((resolve, reject) => {
 
       functionJSON.entryPoint = entryPoint;
       fs.writeFileSync(path.join(folderForJSFunction, 'function.json'), JSON.stringify(functionJSON, null, 4));
+
+      this.copyDependencies(this.serverless.config.servicePath, folderForJSFunction);
+
       const functionZipFile = path.join(functionsFolder, functionName + '.zip');
       zipFolder(folderForJSFunction, functionZipFile, function (createZipErr) {
         if (createZipErr) {
